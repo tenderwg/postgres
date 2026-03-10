@@ -38,6 +38,7 @@
 #include "replication/slotsync.h"
 #include "replication/walreceiver.h"
 #include "replication/walsender.h"
+#include "storage/arbiter.h"
 #include "storage/aio_subsys.h"
 #include "storage/bufmgr.h"
 #include "storage/dsm.h"
@@ -142,6 +143,7 @@ CalculateShmemSize(void)
 	size = add_size(size, AioShmemSize());
 	size = add_size(size, WaitLSNShmemSize());
 	size = add_size(size, LogicalDecodingCtlShmemSize());
+	size = add_size(size, SSLMShmemSize());
 
 	/* include additional requested shmem from preload libraries */
 	size = add_size(size, total_addin_request);
@@ -329,6 +331,7 @@ CreateOrAttachShmemStructs(void)
 	AioShmemInit();
 	WaitLSNShmemInit();
 	LogicalDecodingCtlShmemInit();
+	SSLMShmemInit();
 }
 
 /*

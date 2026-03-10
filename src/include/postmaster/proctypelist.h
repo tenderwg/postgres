@@ -45,6 +45,7 @@ PG_PROCTYPE(B_LOGGER, "syslogger", gettext_noop("syslogger"), SysLoggerMain, fal
 PG_PROCTYPE(B_SLOTSYNC_WORKER, "slotsyncworker", gettext_noop("slotsync worker"), ReplSlotSyncWorkerMain, true)
 PG_PROCTYPE(B_STANDALONE_BACKEND, "backend", gettext_noop("standalone backend"), NULL, false)
 PG_PROCTYPE(B_STARTUP, "startup", gettext_noop("startup"), StartupProcessMain, true)
+PG_PROCTYPE(B_ARBITER, "arbiter", gettext_noop("arbiter"), ArbiterMain, true)
 PG_PROCTYPE(B_WAL_RECEIVER, "walreceiver", gettext_noop("walreceiver"), WalReceiverMain, true)
 PG_PROCTYPE(B_WAL_SENDER, "walsender", gettext_noop("walsender"), NULL, true)
 PG_PROCTYPE(B_WAL_SUMMARIZER, "walsummarizer", gettext_noop("walsummarizer"), WalSummarizerMain, true)

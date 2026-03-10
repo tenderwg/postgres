@@ -265,6 +265,7 @@ static PMChild *StartupPMChild = NULL,
 		   *WalSummarizerPMChild = NULL,
 		   *AutoVacLauncherPMChild = NULL,
 		   *PgArchPMChild = NULL,
+		   *ArbiterPMChild = NULL,
 		   *SysLoggerPMChild = NULL,
 		   *SlotSyncWorkerPMChild = NULL;
 
@@ -1389,6 +1390,8 @@ PostmasterMain(int argc, char *argv[])
 		CheckpointerPMChild = StartChildProcess(B_CHECKPOINTER);
 	if (BgWriterPMChild == NULL)
 		BgWriterPMChild = StartChildProcess(B_BG_WRITER);
+	if (ArbiterPMChild == NULL)
+		ArbiterPMChild = StartChildProcess(B_ARBITER);
 
 	/*
 	 * We're ready to rock and roll...
@@ -2941,13 +2944,14 @@ PostmasterStateMachine(void)
 								B_BG_WORKER);
 
 		/*
-		 * No walwriter, bgwriter, slot sync worker, or WAL summarizer either.
+		 * No walwriter, bgwriter, slot sync worker, WAL summarizer or arbiter either.
 		 */
 		targetMask = btmask_add(targetMask,
 								B_WAL_WRITER,
 								B_BG_WRITER,
 								B_SLOTSYNC_WORKER,
-								B_WAL_SUMMARIZER);
+								B_WAL_SUMMARIZER,
+								B_ARBITER);
 
 		/* If we're in recovery, also stop startup and walreceiver procs */
 		targetMask = btmask_add(targetMask,

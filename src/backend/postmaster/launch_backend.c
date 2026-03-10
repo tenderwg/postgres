@@ -47,6 +47,7 @@
 #include "postmaster/walwriter.h"
 #include "replication/slotsync.h"
 #include "replication/walreceiver.h"
+#include "storage/arbiter.h"
 #include "storage/dsm.h"
 #include "storage/io_worker.h"
 #include "storage/pg_shmem.h"
