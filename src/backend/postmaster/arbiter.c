@@ -276,12 +276,6 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 	/* Reset some signals that are accepted by postmaster but not here */
 	pqsignal(SIGCHLD, SIG_DFL);
 
-	/*
-	lock_fd = open("/dev/mapper/shared_disk_vdev", O_RDWR | O_DIRECT);
-	if (lock_fd < 0)
-		ereport(ERROR, (errmsg("could not open shared storage lock device")));
-	*/
-
 	ereport(LOG, (errmsg("Arbiter process started %d", MyProcPid)));
 	/*
 	 * Unblock signals (they were blocked when the postmaster forked us)
@@ -303,7 +297,7 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 		{
 			/*
 			 * Now we simply assume the primary has gone away.
-			 * Then we promote the slave.
+			 * Then we promote the slave to be a new primary.
 			 * XXX  in shared storage, we should check the new
 			 * leader is whether ourself or not.
 			 */
@@ -314,7 +308,7 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 				do_promote = TryPromoteSlave(false, 1);
 			}
 			else
-				elog(LOG,"after promote, still in recovery");
+				elog(LOG, "after promoting, still in recovery");
 		}
 
 		/* sleep... */
