@@ -28,7 +28,7 @@ typedef struct ArbiterControlData
 	uint64		magic;
 	uint64		generation;
 	uint32		leader_node_id;
-	pg_time_t		heartbeat_ts;
+	pg_time_t	heartbeat_ts;
 	char		leader_conn[256]; 
 } ArbiterControlData;
 

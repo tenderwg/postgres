@@ -17,6 +17,7 @@
 #include "access/xlog.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
+#include "nodes/makefuncs.h"
 #include "postmaster/auxprocess.h"
 #include "postmaster/interrupt.h"
 #include "postmaster/postmaster.h"
@@ -54,6 +55,7 @@ static ArbiterShmemState *ArbiterState = NULL;
 
 static void ProcessArbiterInterrupts();
 static bool TryPromoteSlave(bool wait, int wait_seconds);
+static AlterSystemStmt* CreateDummyASCommand(uint64 gen, int leader_id);
 
 extern bool Atomic_CAS_Disk(int fd, uint64 old_gen, ArbiterControlData *new_ctrl);
 
@@ -114,13 +116,44 @@ ProcessArbiterInterrupts()
 	}
 }
 
+static AlterSystemStmt*
+CreateDummyASCommand(uint64 gen, int leader_id)
+{
+	char conninfo[256];
+	int tmp_generate;
+	int tmp_leader_id;
+	AlterSystemStmt *ass;
+	VariableSetStmt *vss;
+
+	SpinLockAcquire(&ArbiterState->mutext);
+	tmp_generate = ArbiterState->ctl_data.generation;
+	tmp_leader_id = ArbiterState->ctl_data.leader_node_id;
+	memcpy(conninfo, ArbiterState->ctl_data.leader_conn, 256);
+	SpinLockRelease(&ArbiterState->mutext);
+
+	/* double check leader doesn't change */
+	if (tmp_generate != gen || tmp_leader_id != leader_id)
+		return NULL;
+
+	ass = makeNode(AlterSystemStmt);
+	vss = makeNode(VariableSetStmt);
+	vss->kind = VAR_SET_VALUE;
+	vss->location = -1;
+	vss->name = "primary_conninfo";
+	vss->args = list_make1(makeStringConst(conninfo, -1));
+	vss->is_local = false;
+	ass->setstmt = vss;
+
+	return ass;
+}
+
 /*
  * Do something like pg_promote()
  */
 static bool
 TryPromoteSlave(bool wait, int wait_seconds)
 {
-	FILE	   *promote_file;
+	FILE		*promote_file;
 	int			i;
 
 	if (!RecoveryInProgress())
@@ -445,10 +478,12 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 			}
 			else if (need_reconnect)
 			{
-				/* We are not selected to be leader
+				/* We are not selected to be the leader
 				 * We must reconnect the new leader
 				 */
-				
+				AlterSystemStmt *ass = CreateDummyASCommand(local_generation, local_primary_id);
+				AlterSystemSetConfigFile(ass);
+				kill(PostmasterPid, SIGHUP);
 			}
 		}
 
