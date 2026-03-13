@@ -143,7 +143,7 @@ CalculateShmemSize(void)
 	size = add_size(size, AioShmemSize());
 	size = add_size(size, WaitLSNShmemSize());
 	size = add_size(size, LogicalDecodingCtlShmemSize());
-	size = add_size(size, SSLMShmemSize());
+	size = add_size(size, ArbiterShmemSize());
 
 	/* include additional requested shmem from preload libraries */
 	size = add_size(size, total_addin_request);
@@ -331,7 +331,7 @@ CreateOrAttachShmemStructs(void)
 	AioShmemInit();
 	WaitLSNShmemInit();
 	LogicalDecodingCtlShmemInit();
-	SSLMShmemInit();
+	ArbiterShmemInit();
 }
 
 /*

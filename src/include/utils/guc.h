@@ -341,6 +341,7 @@ extern PGDLLIMPORT bool optimize_bounded_sort;
  * that would then require including the definition of struct
  * config_enum_entry into those header files.)
  */
+extern PGDLLIMPORT const struct config_enum_entry cluster_role_options[];
 extern PGDLLIMPORT const struct config_enum_entry archive_mode_options[];
 extern PGDLLIMPORT const struct config_enum_entry dynamic_shared_memory_options[];
 extern PGDLLIMPORT const struct config_enum_entry io_method_options[];

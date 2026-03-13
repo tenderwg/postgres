@@ -11,25 +11,35 @@
 #include "storage/shmem.h"
 #include "storage/spin.h"
 
+extern PGDLLIMPORT int node_id;
+
+typedef enum cluster_type
+{
+	unknown,
+	primary,
+	slave,
+} cluster_type;
+
+extern PGDLLIMPORT int cluster_role;
+
 /* Shared-memory state for arbiter */
-typedef struct ArbiterControlData {
-	uint64      magic;
-	uint64      generation;
-	uint32      leader_node_id;
-	uint64      heartbeat_ts;
-	char        leader_conn[256]; 
-	uint8       padding[232];
+typedef struct ArbiterControlData
+{
+	uint64		magic;
+	uint64		generation;
+	uint32		leader_node_id;
+	pg_time_t		heartbeat_ts;
+	char		leader_conn[256]; 
 } ArbiterControlData;
 
-typedef struct ArbiterSharedState {
-	slock_t     mutex;
-	ArbiterControlData last_disk_copy;
-	bool        is_leader;
-	Latch       proc_latch;
-} ArbiterSharedState;
+typedef struct ArbiterShmemState
+{
+	ArbiterControlData  ctl_data;
+	slock_t		mutext;
+} ArbiterShmemState;
 
 extern void ArbiterMain(const void *startup_data, size_t startup_data_len);
-extern size_t SSLMShmemSize(void);
-extern void SSLMShmemInit(void);
+extern size_t ArbiterShmemSize(void);
+extern void ArbiterShmemInit(void);
 
 #endif

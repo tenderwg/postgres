@@ -434,6 +434,13 @@
   check_hook => 'check_cluster_name',
 },
 
+{ name => 'cluster_role', type => 'enum', context => 'PGC_POSTMASTER', group => 'PROCESS_TITLE',
+  short_desc => 'Sets the role of the instance in the cluster',
+  variable => 'cluster_role',
+  boot_val => 'unknown',
+  options => 'cluster_role_options',
+},
+
 # we have no microseconds designation, so can't supply units here
 { name => 'commit_delay', type => 'int', context => 'PGC_SUSET', group => 'WAL_SETTINGS',
   short_desc => 'Sets the delay in microseconds between transaction commit and flushing WAL to disk.',
@@ -2188,6 +2195,16 @@
   min => '16',
   max => 'SLRU_MAX_ALLOWED_BUFFERS',
   check_hook => 'check_multixact_offset_buffers',
+},
+
+{ name => 'node_id', type => 'int', context => 'PGC_POSTMASTER', group => 'RESOURCES_MEM',
+  short_desc => 'Sets the unique identifier for this node within the cluster',
+  flags => 'GUC_UNIT_BLOCKS',
+  variable => 'node_id',
+  boot_val => '1',
+  min => '1',
+  max => '32',
+  check_hook => 'check_notify_buffers',
 },
 
 { name => 'notify_buffers', type => 'int', context => 'PGC_POSTMASTER', group => 'RESOURCES_MEM',
