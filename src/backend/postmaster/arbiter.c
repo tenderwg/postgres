@@ -15,6 +15,7 @@
 
 
 #include "access/xlog.h"
+#include "catalog/pg_authid.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -39,8 +40,8 @@
 #define ARBITER_STATE_MAGIC ((uint32) 0x1257DADE)
 
 /* GUC parameters */
-int node_id = 1;
-int cluster_role = unknown;
+int node_id;
+int cluster_role;
 
 
 /* Options for cluster_role. */
@@ -321,7 +322,7 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 								CLUSTER_CONTROL_FILE)));
 			/* Cluster is first startup, we should create the control file */
 			fd = BasicOpenFile(CLUSTER_CONTROL_FILE,
-					   O_RDWR | PG_BINARY);
+					   O_RDWR | PG_BINARY|O_CREAT);
 			if (fd < 0)
 				ereport(PANIC,
 						(errcode_for_file_access(),
@@ -342,6 +343,7 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 						 errmsg("could not write to file \"%s\": %m",
 							CLUSTER_CONTROL_FILE)));
 			}
+			(void) pg_fsync(fd);
 			if (close(fd) != 0)
 				ereport(PANIC,
 						(errcode_for_file_access(),
@@ -446,6 +448,14 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 			SpinLockRelease(&ArbiterState->mutext);
 			if (local_cluster_role == primary)
 			{
+				/* We must overwrite old data */
+				if (lseek(fd, 0, SEEK_SET) == (off_t) -1)
+				{
+					ereport(ERROR,
+							(errcode_for_file_access(),
+							 errmsg("could not seek in file \"%s\": %m",
+								CLUSTER_CONTROL_FILE)));
+				}
 				/* We are the new leader */
 				if (write(fd, &ArbiterState->ctl_data, sizeof(ArbiterControlData)) !=
 					  sizeof(ArbiterControlData))
@@ -455,6 +465,7 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 							 errmsg("could not write to file \"%s\": %m",
 								CLUSTER_CONTROL_FILE)));
 				}
+				(void) pg_fsync(fd);
 			}
 			fl.l_type = F_UNLCK;
 			fcntl(fd, F_SETLK, &fl);
@@ -481,8 +492,19 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 				/* We are not selected to be the leader
 				 * We must reconnect the new leader
 				 */
-				AlterSystemStmt *ass = CreateDummyASCommand(local_generation, local_primary_id);
-				AlterSystemSetConfigFile(ass);
+				Oid			save_userid = 0;
+				int			save_sec_context = 0;
+				AlterSystemStmt *ass = NULL;
+				GetUserIdAndSecContext(&save_userid, &save_sec_context);
+				SetUserIdAndSecContext(BOOTSTRAP_SUPERUSERID,
+									   save_sec_context | SECURITY_LOCAL_USERID_CHANGE);
+				IsUnderPostmaster = false;
+				ass = CreateDummyASCommand(local_generation, local_primary_id);
+				/*Note: We must be superuser */
+				if (ass != NULL)
+					AlterSystemSetConfigFile(ass);
+				SetUserIdAndSecContext(save_userid, save_sec_context);
+				IsUnderPostmaster = true;
 				kill(PostmasterPid, SIGHUP);
 			}
 		}

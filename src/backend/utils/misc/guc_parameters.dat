@@ -2204,7 +2204,7 @@
   boot_val => '1',
   min => '1',
   max => '32',
-  check_hook => 'check_notify_buffers',
+  check_hook => 'check_node_id',
 },
 
 { name => 'notify_buffers', type => 'int', context => 'PGC_POSTMASTER', group => 'RESOURCES_MEM',
