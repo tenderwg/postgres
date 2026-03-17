@@ -2466,6 +2466,20 @@ process_pm_child_exit(void)
 		}
 
 		/*
+		 * Was it the arbiter process? Normal exit can be ignored; we'll start
+		 * a new one at the next iteration of the postmaster's main loop, if
+		 * necessary.  Any other exit condition is treated as a crash.
+		 */
+		if (ArbiterPMChild && pid == ArbiterPMChild->pid)
+		{
+			ReleasePostmasterChildSlot(ArbiterPMChild);
+			ArbiterPMChild = NULL;
+			if (!EXIT_STATUS_0(exitstatus))
+				HandleChildCrash(pid, exitstatus,
+								 _("arbiter process"));
+			continue;
+		}
+		/*
 		 * Was it the autovacuum launcher?	Normal exit can be ignored; we'll
 		 * start a new one at the next iteration of the postmaster's main
 		 * loop, if necessary.  Any other exit condition is treated as a
@@ -3160,6 +3174,7 @@ PostmasterStateMachine(void)
 			Assert(WalWriterPMChild == NULL);
 			Assert(AutoVacLauncherPMChild == NULL);
 			Assert(SlotSyncWorkerPMChild == NULL);
+			Assert(ArbiterPMChild == NULL);
 			/* syslogger is not considered here */
 			UpdatePMState(PM_NO_CHILDREN);
 		}
@@ -3414,6 +3429,10 @@ LaunchMissingBackgroundProcesses(void)
 		(pmState == PM_RUN || pmState == PM_HOT_STANDBY) &&
 		Shutdown <= SmartShutdown)
 		WalSummarizerPMChild = StartChildProcess(B_WAL_SUMMARIZER);
+
+	/* If we need to start a Arbiter process ,try to do that now */
+	if (ArbiterPMChild == NULL && pmState == PM_RUN)
+		ArbiterPMChild = StartChildProcess(B_ARBITER);
 
 	/* Get other worker processes running, if needed */
 	if (StartWorkerNeeded || HaveCrashedWorker)
