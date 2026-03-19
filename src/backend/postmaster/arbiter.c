@@ -35,6 +35,7 @@
 #include "utils/wait_event.h"
 
 #define LEADER_LEASE_TIMEOUT 10
+#define MAX_TRY_COUNTER 10
 #define CLUSTER_CONTROL_FILE "/tmp/tac_cluster"
 /* Magic for on disk files. */
 #define ARBITER_STATE_MAGIC ((uint32) 0x1257DADE)
@@ -60,6 +61,7 @@ static AlterSystemStmt* CreateDummyASCommand(uint64 gen, int leader_id);
 static void ReadClusterControlFile(void);
 static void WriteClusterControlFile(void);
 static void UpdateClusterControlFile();
+static bool DoesDiskHearbeatStillUpdate();
 static void PromoteToLeader(cluster_type *role, bool *need_reconnect, uint64 *gen,
 							int *primary_id);
 
@@ -338,6 +340,38 @@ UpdateClusterControlFile()
 }
 
 /*
+ * The network and disk heartbeats both don't change anymore,
+ * then we make a decision that leader is dead.
+ * Otherwise, the leader is alive, slaves cannot to be promote.
+ */
+static bool
+DoesDiskHearbeatStillUpdate()
+{
+	int tryCounter = 0;
+	bool is_alive = false;
+	pg_time_t current = (pg_time_t) time(NULL);
+
+	while (tryCounter < MAX_TRY_COUNTER)
+	{
+		current = (pg_time_t)time(NULL);
+
+		ReadClusterControlFile();
+
+		if ((current - ArbiterState->ctl_data.heartbeat_ts) < 3)
+		{
+			is_alive = true;
+			break;
+		}
+
+		tryCounter++;
+
+		pg_usleep(1000000L);
+	}
+
+	return is_alive;
+}
+
+/*
  * Slaves try to acquire the leadership
  * Only one can success, others should re-connect to the
  * new leader
@@ -414,10 +448,12 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 	uint64 local_generation = 0;
 	cluster_type local_cluster_role = cluster_role;
 	bool need_reconnect = false;
+
 	Assert(startup_data_len == 0);
 
 	continue_sleep = false;
-	do {
+	do
+	{
 		sleep(1);
 	} while (continue_sleep);
 
@@ -502,16 +538,22 @@ ArbiterMain(const void *startup_data, size_t startup_data_len)
 			!WalRcvRunning() &&
 			RecoveryInProgress())
 		{
+			/*
+			 * XXX: we must check cluster control file to make
+			 * sure that the leader has been dead.
+			 */
 			/* The leader has gone away, try to be the new leader */
-			PromoteToLeader(&local_cluster_role, &need_reconnect,
-							&local_generation, &local_primary_id);
+			if (!DoesDiskHearbeatStillUpdate())
+				PromoteToLeader(&local_cluster_role, &need_reconnect,
+								&local_generation, &local_primary_id);
 
 			if (local_cluster_role == primary)
 			{
-				/* We are the new leader */
+				/* We become the new leader */
+				elog(LOG, "We become the new leader, first write info into Cluster Control file");
 				WriteClusterControlFile();
 			}
-			
+
 			/*
 			 * Now we simply assume the primary has gone away.
 			 * Then we promote the slave to be a new primary.
