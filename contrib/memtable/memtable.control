@@ -1,0 +1,6 @@
+# memtable extension
+comment = 'function for in-memory table'
+default_version = '0.1'
+module_pathname = '$libdir/memtable'
+relocatable = false
+schema = 'memtable'
